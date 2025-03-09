@@ -1,0 +1,36 @@
+from zerepy import ZereAgent
+from web3 import Web3
+import os
+
+# Load environment variables
+SONIC_RPC_URL = os.getenv('SONIC_RPC_URL')
+PRIVATE_KEY = os.getenv('PRIVATE_KEY')
+CONTRACT_ADDRESS = os.getenv('CONTRACT_ADDRESS')
+
+# Blockchain connection
+w3 = Web3(Web3.HTTPProvider(SONIC_RPC_URL))
+account = w3.eth.account.from_key(PRIVATE_KEY)
+
+# Initialize AI Market Maker
+agent = ZereAgent(model="dqn", learning_rate=0.001)
+agent.train(episodes=10000)
+
+# Function to execute trades
+def execute_trade(action):
+    contract = w3.eth.contract(address=CONTRACT_ADDRESS, abi=["function executeTrade(string action, uint256 amount)"])
+    tx = contract.functions.executeTrade(action, 1).build_transaction({
+        'from': account.address,
+        'gas': 300000,
+        'gasPrice': w3.toWei('2', 'gwei'),
+        'nonce': w3.eth.get_transaction_count(account.address),
+    })
+    signed_tx = w3.eth.account.sign_transaction(tx, PRIVATE_KEY)
+    return w3.eth.send_raw_transaction(signed_tx.rawTransaction).hex()
+
+# Run the AI trading loop
+while True:
+    action = agent.predict()
+    execute_trade(action)
+
+
+
